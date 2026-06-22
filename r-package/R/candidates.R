@@ -78,6 +78,37 @@
   }
 }
 
+.validate_candidate_integer <- function(x, name, minimum) {
+  if (!is.numeric(x) || length(x) != 1L || is.na(x) || !is.finite(x) ||
+      x != floor(x) || x < minimum) {
+    .mc_stop(
+      "mergecalib_error_input",
+      "`", name, "` must be a single integer greater than or equal to ",
+      minimum, "."
+    )
+  }
+  as.integer(x)
+}
+
+.validate_candidate_number <- function(x, name, minimum = 0, allow_infinite = TRUE) {
+  if (!is.numeric(x) || length(x) != 1L || is.na(x)) {
+    .mc_stop(
+      "mergecalib_error_input",
+      "`", name, "` must be a single numeric value greater than or equal to ",
+      minimum, "."
+    )
+  }
+  finite_ok <- is.finite(x) || (allow_infinite && is.infinite(x) && x > 0)
+  if (!finite_ok || x < minimum) {
+    .mc_stop(
+      "mergecalib_error_input",
+      "`", name, "` must be a single numeric value greater than or equal to ",
+      minimum, "."
+    )
+  }
+  as.numeric(x)
+}
+
 .cluster_metrics <- function(members, data, spec, dist) {
   n <- data[[spec$n]][members]
   w <- data[[spec$weight]][members]
@@ -208,12 +239,14 @@ generate_candidate_clusters <- function(
   include_province_fallback = FALSE
 ) {
   validate_merge_data(data, spec = spec)
-  max_cluster_size <- as.integer(max_cluster_size)
-  max_neighbors <- as.integer(max_neighbors)
-  max_combinations_per_cell <- as.integer(max_combinations_per_cell)
-  if (max_cluster_size < 2L || max_neighbors < 1L || max_combinations_per_cell < 1L) {
-    .mc_stop("mergecalib_error_candidate", "Candidate parameters must satisfy max_cluster_size >= 2, max_neighbors >= 1, and max_combinations_per_cell >= 1.")
-  }
+  max_cluster_size <- .validate_candidate_integer(max_cluster_size, "max_cluster_size", 2L)
+  max_neighbors <- .validate_candidate_integer(max_neighbors, "max_neighbors", 1L)
+  max_combinations_per_cell <- .validate_candidate_integer(
+    max_combinations_per_cell, "max_combinations_per_cell", 1L
+  )
+  max_distance <- .validate_candidate_number(max_distance, "max_distance")
+  max_unit_weight <- .validate_candidate_number(max_unit_weight, "max_unit_weight")
+  max_weight_ratio <- .validate_candidate_number(max_weight_ratio, "max_weight_ratio")
 
   data <- as.data.frame(data, stringsAsFactors = FALSE)
   distance_spec <- .distance_spec_global_ordered_levels(data, spec)

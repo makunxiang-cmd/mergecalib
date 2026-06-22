@@ -191,6 +191,20 @@
   character()
 }
 
+.highs_string_option_values <- function(option) {
+  switch(
+    option,
+    presolve = c("off", "choose", "on"),
+    solver = c("choose", "simplex", "ipm", "ipx", "pdlp"),
+    parallel = c("off", "choose", "on"),
+    run_crossover = c("off", "choose", "on"),
+    ranging = c("off", "on"),
+    mip_lp_solver = c("choose", "simplex", "ipm", "ipx"),
+    mip_ipm_solver = c("choose", "simplex", "ipm", "ipx"),
+    NULL
+  )
+}
+
 .validate_solver_control <- function(solver_control) {
   if (is.null(solver_control)) return(list())
   if (!is.list(solver_control)) {
@@ -220,6 +234,19 @@
         "Unknown `solver_control` option",
         if (length(unknown) > 1L) "s" else "",
         ": ", paste(unknown, collapse = ", "), "."
+      )
+    }
+  }
+  for (option in nms) {
+    allowed_values <- .highs_string_option_values(option)
+    if (is.null(allowed_values)) next
+    value <- solver_control[[option]]
+    if (!is.character(value) || length(value) != 1L || is.na(value) ||
+        !value %in% allowed_values) {
+      .mc_stop(
+        "mergecalib_error_input",
+        "`solver_control$", option, "` must be one of: ",
+        paste(allowed_values, collapse = ", "), "."
       )
     }
   }

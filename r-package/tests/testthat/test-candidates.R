@@ -28,3 +28,28 @@ test_that("explicit ordered levels missing observed data use input class", {
     class = "mergecalib_error_input"
   )
 })
+
+test_that("invalid candidate controls use input class", {
+  dat <- example_merge_data()
+  spec <- merge_spec(level_orders = list(
+    age = c("18-39", "40+"),
+    education = c("low", "high")
+  ))
+
+  expect_error(
+    generate_candidate_clusters(dat, spec, max_cluster_size = 1),
+    class = "mergecalib_error_input"
+  )
+  expect_error(
+    generate_candidate_clusters(dat, spec, max_cluster_size = "x"),
+    class = "mergecalib_error_input"
+  )
+  expect_error(
+    generate_candidate_clusters(dat, spec, max_neighbors = NA_integer_),
+    class = "mergecalib_error_input"
+  )
+  expect_error(
+    generate_candidate_clusters(dat, spec, max_distance = list(1)),
+    class = "mergecalib_error_input"
+  )
+})

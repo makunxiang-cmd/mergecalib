@@ -81,7 +81,8 @@ test_that("invalid solver_control uses input class", {
     non_list = 1,
     unnamed = list(60),
     unknown_option = list(not_a_highs_option = 1),
-    invalid_threads = list(threads = 0)
+    invalid_threads = list(threads = 0),
+    invalid_presolve = list(presolve = "bad")
   )
 
   for (solver_control in bad_controls) {
