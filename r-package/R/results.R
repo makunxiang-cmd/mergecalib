@@ -288,6 +288,67 @@ target_results <- function(fit) {
   .compute_target_results(fit)
 }
 
+.emit_fit_warnings <- function(fit) {
+  if (identical(getOption("mergecalib.warn", TRUE), FALSE)) return(invisible(NULL))
+  thresholds <- .mc_warning_thresholds()
+  final <- final_cells(fit)
+
+  if (is.finite(thresholds$relaxation_delta) &&
+      isTRUE(fit$delta > thresholds$relaxation_delta)) {
+    .mc_warn(
+      "mergecalib_warning_relaxation",
+      "Minimum uniform target relaxation is ",
+      .compact_number(fit$delta),
+      ", above the warning threshold ",
+      .compact_number(thresholds$relaxation_delta),
+      "."
+    )
+  }
+
+  max_ratio <- max(final$max_weight_ratio)
+  if (is.finite(thresholds$max_weight_ratio) &&
+      isTRUE(max_ratio > thresholds$max_weight_ratio)) {
+    .mc_warn(
+      "mergecalib_warning_weight_distortion",
+      "Maximum final weight ratio is ",
+      .compact_number(max_ratio),
+      ", above the warning threshold ",
+      .compact_number(thresholds$max_weight_ratio),
+      "."
+    )
+  }
+
+  max_heterogeneity <- max(final$heterogeneity)
+  if (is.finite(thresholds$heterogeneity) &&
+      isTRUE(max_heterogeneity > thresholds$heterogeneity)) {
+    .mc_warn(
+      "mergecalib_warning_heterogeneity",
+      "Maximum final cluster heterogeneity is ",
+      .compact_number(max_heterogeneity),
+      ", above the warning threshold ",
+      .compact_number(thresholds$heterogeneity),
+      "."
+    )
+  }
+
+  tr <- .compute_target_results(fit)
+  margin <- pmin(
+    abs(tr$final_proportion - tr$effective_lower),
+    abs(tr$effective_upper - tr$final_proportion)
+  )
+  if (is.finite(thresholds$near_binding_margin) &&
+      any(margin <= thresholds$near_binding_margin, na.rm = TRUE)) {
+    .mc_warn(
+      "mergecalib_warning_near_binding",
+      "At least one target is within ",
+      .compact_number(thresholds$near_binding_margin),
+      " of an effective interval boundary."
+    )
+  }
+
+  invisible(NULL)
+}
+
 #' Province-level grade proportions
 #' @param fit A fitted model.
 #' @export

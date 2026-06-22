@@ -313,5 +313,6 @@ fit_merge_calibration <- function(
   if (!isTRUE(audit$valid)) {
     .mc_stop("mergecalib_error_internal", "Final audit failed: ", paste(audit$issues, collapse = "; "), ".")
   }
+  .emit_fit_warnings(fit)
   fit
 }
