@@ -5,7 +5,7 @@
       code <- match(as.character(x), as.character(explicit))
       if (anyNA(code)) {
         unknown <- unique(as.character(x)[is.na(code)])
-        .mc_stop("mergecalib_error_internal", "Ordinal variable `", group_name, "` has values not listed in level_orders: ",
+        .mc_stop("mergecalib_error_input", "Ordinal variable `", group_name, "` has values not listed in level_orders: ",
                  paste(unknown, collapse = ", "), ".")
       }
       return(as.numeric(code))
