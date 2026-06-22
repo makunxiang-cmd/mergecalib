@@ -21,6 +21,7 @@ dist/
 docs/user-manual/*.pdf
 *_中文.md
 AGENTS.md
+.worktrees/
 
 # Legacy local directories
 Rscripts/
