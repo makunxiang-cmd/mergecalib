@@ -240,8 +240,8 @@ Target: meaningful coverage on every exported function; CI matrix already in
 - Runnable examples on every exported function (wrap solver calls in
   `\donttest{}`); decide roxygen-vs-handwritten `.Rd` (recommend migrating to
   roxygen2 and regenerating).
-- Update `NEWS.md`; update `AGENTS.md` for new internals (solver interface,
-  condition classes, decomposition).
+- Update `NEWS.md`; update maintainer documentation for new internals (solver
+  interface, condition classes, decomposition).
 
 ---
 
@@ -279,4 +279,4 @@ After 0.2.0 stabilises:
 - All v0.1.0 invariants verified by tests.
 - `devtools::check()` clean except known pre-CRAN gaps tracked for the CRAN pass.
 - Determinism re-verified (serial vs parallel bit-identity).
-- `NEWS.md`, vignette, and `AGENTS.md` updated.
+- `NEWS.md`, vignette, and maintainer documentation updated.

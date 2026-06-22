@@ -62,7 +62,7 @@ Then inspect the generated `man/` and `NAMESPACE` diffs before committing.
 - Examples are runnable or wrapped appropriately for solver-dependent paths.
 - Maintainer email in `DESCRIPTION` can receive CRAN confirmation email.
 - The package tarball does not include repository-only files such as `.github/`,
-  root `docs/`, `AGENTS.md`, examples, tools, or local built artifacts.
+  root `docs/`, examples, local handoff files, or local built artifacts.
 
 ## Repository Hygiene
 

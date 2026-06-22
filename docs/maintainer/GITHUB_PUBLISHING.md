@@ -31,12 +31,6 @@ Authentication options:
 - HTTPS with a GitHub personal access token that can write to the repository.
 - GitHub CLI authentication with `gh auth login`.
 
-The helper script remains available:
-
-```sh
-sh tools/push_to_github.sh
-```
-
 ## Optional SSH Remote
 
 ```sh

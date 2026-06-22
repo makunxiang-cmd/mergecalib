@@ -17,8 +17,10 @@ r-package/docs/
 r-package/Meta/
 
 # Local-only distribution outputs
-dist/*
-!dist/.gitkeep
+dist/
+docs/user-manual/*.pdf
+*_中文.md
+AGENTS.md
 
 # Legacy local directories
 Rscripts/

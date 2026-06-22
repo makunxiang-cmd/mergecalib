@@ -12,8 +12,6 @@ This directory holds maintainer-facing documentation for `mergecalib`.
   workflow.
 - [v0.2.0 roadmap](ROADMAP_v0.2.0.md) is the staged technical roadmap after
   v0.1.0.
-- [Root agent handoff](../AGENTS.md) is the canonical file for AI agents and new
-  maintainers taking over the repository.
 
 ## Repository Boundary
 
@@ -24,8 +22,7 @@ The Git repository root is the project root:
 ```
 
 The R package source lives in `r-package/`. Root-level visible files are kept to
-`README.md`, `AGENTS.md`, and the Chinese project note; other content is grouped
-under purpose-specific directories.
+`README.md`; other content is grouped under purpose-specific directories.
 
 The package's pkgdown workflow builds the public website into
 `r-package/docs/` during CI. Maintainer-authored documentation belongs here in

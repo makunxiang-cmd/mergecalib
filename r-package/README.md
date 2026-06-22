@@ -89,9 +89,6 @@ Maintainer-facing documentation lives under
 - [`../docs/maintainer/ROADMAP_v0.2.0.md`](../docs/maintainer/ROADMAP_v0.2.0.md)
   tracks the planned v0.2.0 workstreams.
 
-The root [`../AGENTS.md`](../AGENTS.md) is the handoff file for AI agents and
-new maintainers.
-
 ## Quick example
 
 ```r
