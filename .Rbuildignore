@@ -11,5 +11,7 @@
 ^CONTRIBUTING\.md$
 ^CODE_OF_CONDUCT\.md$
 ^AGENTS\.md$
+^GIT_AND_PUSH\.md$
+^push_to_github\.sh$
 ^\.DS_Store$
 ^LICENSE\.md$
