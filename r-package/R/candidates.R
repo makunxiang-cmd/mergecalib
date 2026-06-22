@@ -5,7 +5,7 @@
       code <- match(as.character(x), as.character(explicit))
       if (anyNA(code)) {
         unknown <- unique(as.character(x)[is.na(code)])
-        .mc_stop("Ordinal variable `", group_name, "` has values not listed in level_orders: ",
+        .mc_stop("mergecalib_error_internal", "Ordinal variable `", group_name, "` has values not listed in level_orders: ",
                  paste(unknown, collapse = ", "), ".")
       }
       return(as.numeric(code))
@@ -177,7 +177,7 @@ generate_candidate_clusters <- function(
   max_neighbors <- as.integer(max_neighbors)
   max_combinations_per_cell <- as.integer(max_combinations_per_cell)
   if (max_cluster_size < 2L || max_neighbors < 1L || max_combinations_per_cell < 1L) {
-    .mc_stop("Candidate parameters must satisfy max_cluster_size >= 2, max_neighbors >= 1, and max_combinations_per_cell >= 1.")
+    .mc_stop("mergecalib_error_internal", "Candidate parameters must satisfy max_cluster_size >= 2, max_neighbors >= 1, and max_combinations_per_cell >= 1.")
   }
 
   data <- as.data.frame(data, stringsAsFactors = FALSE)
@@ -235,6 +235,7 @@ generate_candidate_clusters <- function(
         metric <- .cluster_metrics(members, data, spec, dist_mat)
         if (metric$unit_weight > max_unit_weight || metric$max_weight_ratio > max_weight_ratio) {
           .mc_stop(
+            "mergecalib_error_internal",
             "Zero-sample cells in province `", p, "` cannot be absorbed into a positive-sample cell under the current weight bounds. ",
             "Please relax max_unit_weight or max_weight_ratio."
           )
@@ -250,7 +251,7 @@ generate_candidate_clusters <- function(
     }
   }
 
-  if (!length(store)) .mc_stop("No candidate merged clusters were generated.")
+  if (!length(store)) .mc_stop("mergecalib_error_internal", "No candidate merged clusters were generated.")
   keys <- sort(names(store), method = "radix")
   store <- store[keys]
   rows <- lapply(seq_along(store), function(i) {
@@ -282,10 +283,10 @@ generate_candidate_clusters <- function(
   cover <- tabulate(unlist(out$members), nbins = nrow(data))
   if (any(cover == 0L)) {
     bad <- data[[spec$id]][cover == 0L]
-    .mc_stop("The following original cells are not covered by any candidate cluster: ", paste(bad, collapse = ", "), ".")
+    .mc_stop("mergecalib_error_internal", "The following original cells are not covered by any candidate cluster: ", paste(bad, collapse = ", "), ".")
   }
   if (any(out$n_total <= 0)) {
-    .mc_stop("Internal error: a candidate cluster with sample size 0 was produced.")
+    .mc_stop("mergecalib_error_internal", "Internal error: a candidate cluster with sample size 0 was produced.")
   }
   attr(out, "distance_weights") <- distance_weights
   out

@@ -1,11 +1,3 @@
-.mc_stop <- function(..., call. = FALSE) {
-  stop(..., call. = call.)
-}
-
-.mc_warn <- function(..., call. = FALSE) {
-  warning(..., call. = call.)
-}
-
 .is_integerish <- function(x, tol = 1e-8) {
   is.numeric(x) && all(is.finite(x)) && all(abs(x - round(x)) <= tol)
 }
@@ -60,6 +52,7 @@
 .assert_installed <- function(package) {
   if (!requireNamespace(package, quietly = TRUE)) {
     .mc_stop(
+      "mergecalib_error_internal",
       "The R package '", package, "' is required to solve the model. ",
       "Please run install.packages(\"", package, "\")."
     )

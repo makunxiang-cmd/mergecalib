@@ -74,7 +74,7 @@
   nr_cells <- nrow(data)
   nt <- nrow(targets)
   if (is.null(objective)) objective <- rep(0, nc)
-  if (length(objective) != nc) .mc_stop("Internal error: objective length does not match the number of candidate clusters.")
+  if (length(objective) != nc) .mc_stop("mergecalib_error_internal", "Internal error: objective length does not match the number of candidate clusters.")
 
   incidence <- .candidate_incidence(candidates, nr_cells)
   coef <- .target_coefficients(
