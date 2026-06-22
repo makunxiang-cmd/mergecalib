@@ -1,0 +1,33 @@
+Package: mergecalib
+Type: Package
+Title: Deterministic Cell Merging for Interval Calibration Targets
+Version: 0.1.0
+Authors@R: person(given = "Kunxiang", family = "Ma", role = c("aut", "cre"), email = "makunxiangiphone@icloud.com")
+Description: Builds deterministic within-province cell-merging plans for
+    demographic cell data. Final merged cells are constrained to have positive
+    sample size. Provincial and national subgroup proportions for multiple
+    outcome grades can be required to fall inside user-supplied intervals.
+    Candidate clusters are selected with a set-partitioning mixed-integer
+    linear program, followed by lexicographic minimization of merged sample
+    size, demographic distance, outcome heterogeneity, weight distortion, and
+    merge count. Structural infeasibility and the minimum uniform target-range
+    relaxation are reported explicitly.
+License: MIT + file LICENSE
+URL: https://github.com/makunxiang-cmd/mergecalib
+BugReports: https://github.com/makunxiang-cmd/mergecalib/issues
+Encoding: UTF-8
+Language: en-US
+Depends: R (>= 4.1.0)
+Imports:
+    Matrix,
+    graphics,
+    highs (>= 1.9.0),
+    stats,
+    utils
+Suggests:
+    testthat (>= 3.0.0),
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr
+Config/testthat/edition: 3
+RoxygenNote: 7.3.2

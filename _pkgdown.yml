@@ -1,0 +1,36 @@
+url: https://makunxiang-cmd.github.io/mergecalib/
+
+template:
+  bootstrap: 5
+
+reference:
+- title: Specification
+  contents:
+  - merge_spec
+  - default_candidate_levels
+- title: Validation and candidates
+  contents:
+  - validate_merge_data
+  - generate_candidate_clusters
+- title: Fitting
+  contents:
+  - fit_merge_calibration
+- title: Results and audit
+  contents:
+  - cell_map
+  - merge_plan
+  - final_cells
+  - target_results
+  - province_results
+  - national_cell_results
+  - calculate_results
+  - audit_merge_fit
+  - export_merge_results
+- title: Disclaimer
+  contents:
+  - mergecalib_disclaimer
+  - mergecalib_agree
+- title: Example data
+  contents:
+  - example_merge_data
+  - example_merge_targets

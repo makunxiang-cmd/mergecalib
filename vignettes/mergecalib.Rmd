@@ -1,0 +1,158 @@
+---
+title: "mergecalib: within-province cell merging and proportion-interval calibration"
+author: "Kunxiang Ma"
+date: "2026-06-22"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+vignette: >
+  %\VignetteIndexEntry{mergecalib: cell merging and interval calibration}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+# 1. The problem addressed
+
+`mergecalib` operates on data whose rows are demographic cells. Each cell is
+defined by province, sex, urban/rural status, age group, and education level,
+and carries a sample size, a total survey weight, and the counts of four outcome
+grades A, B, C, and D. The package merges original cells **only within a
+province** and adjusts the weighted proportions of provincial and national
+populations through the common unit weight of each merged cell.
+
+# 2. The merged weight
+
+If a final cluster $C$ contains several original cells, then:
+
+$$N_C=\sum_{i\in C}n_i,\qquad W_C=\sum_{i\in C}W_i$$
+
+All observations in the cluster share the common unit weight:
+
+$$\bar w_C=\frac{W_C}{N_C}$$
+
+A candidate cluster must therefore satisfy $N_C>0$.
+
+# 3. The hard constraint on zero-sample cells
+
+The package enforces the following rules:
+
+1. positive-sample cells may stand alone;
+2. zero-sample cells may **not** stand alone;
+3. every zero-sample cell must join a positive-sample candidate cluster in the
+   same province;
+4. each province is given at least one deterministic zero-sample absorption
+   partition;
+5. after solving, the condition `final_n > 0` is re-checked for every cluster;
+6. if an entire province has total sample size 0, a structural infeasibility is
+   reported immediately.
+
+# 4. Target intervals
+
+For a target population $h$ and grade $k$, we require:
+
+$$L_{hk}\leq P_{hk}\leq U_{hk}$$
+
+Because a candidate cluster's unit weight and its contribution to each target
+become constants once the cluster is generated, the proportion bounds turn into
+linear constraints and are handed to the mixed-integer linear program.
+
+# 5. Quick example
+
+```{r eval=FALSE}
+library(mergecalib)
+mergecalib_agree(TRUE)  # acknowledge the disclaimer for this session
+
+spec <- merge_spec(
+  level_orders = list(
+    age = c("18-39", "40+"),
+    education = c("low", "high")
+  )
+)
+
+dat <- example_merge_data()
+targets <- example_merge_targets(dat, spec)
+
+fit <- fit_merge_calibration(dat, targets, spec)
+print(fit)
+summary(fit)
+```
+
+# 6. Wildcard rules in the target table
+
+The province, sex, urban, age, and education fields of the target table may hold
+a concrete value or `NA` / `"*"`. For example:
+
+- provincial target: fill in the province, leave the other dimensions `NA`;
+- national-male target: province `NA`, sex set to "M";
+- national cross-classified target: province `NA`, with sex, urban, age, and
+  education all set.
+
+# 7. Candidate-expansion levels
+
+By default the search proceeds through four levels: local pairwise merges, local
+small clusters, broader candidates, and the widest candidates. The space is only
+widened when the narrower candidates are infeasible, balancing speed and
+feasibility.
+
+# 8. Lexicographic optimisation
+
+Once the targets are satisfied strictly, the package minimises, in order:
+
+1. the reweighted (moved) sample size;
+2. the demographic distance of merged cells;
+3. the heterogeneity of the ABCD distribution;
+4. the change in unit weight;
+5. the number of merges.
+
+The optimal value of each stage becomes a constraint for the next, so a
+higher-priority objective is never sacrificed because of a subjective weighting.
+
+# 9. Infeasible targets and the minimum relaxation
+
+If the original targets are infeasible, the package re-solves at fixed
+relaxation amounts and uses a binary search to find the minimum uniform
+relaxation. The result is stored in:
+
+```{r eval=FALSE}
+fit$delta
+```
+
+# 10. Outputs and audit
+
+```{r eval=FALSE}
+cell_map(fit)
+merge_plan(fit)
+final_cells(fit)
+target_results(fit)
+province_results(fit)
+national_cell_results(fit)
+audit_merge_fit(fit)
+```
+
+`audit_merge_fit()` checks: final zero-sample clusters, the exact one-time
+cover, sample-size conservation, weight conservation, the effective target
+intervals, and the MILP constraint residuals.
+
+# 11. Performance notes
+
+For the common scale of around 100 original cells per province, start with the
+default candidate levels. Only widen `max_neighbors`, `max_cluster_size`, and
+`max_combinations_per_cell` when the targets are especially tight or the cells
+are very heterogeneous. Solving is single-threaded by default to guarantee
+determinism.
+
+# 12. Cases that merging cannot solve
+
+The following situations raise an explicit error:
+
+- a province with total sample size 0;
+- a target population with zero total observed sample;
+- a row whose ABCD counts do not sum to the sample size;
+- a positive-sample cell whose total weight is not positive;
+- a self-contradictory target interval;
+- no solution even within the allowed candidate space and maximum relaxation.

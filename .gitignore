@@ -1,0 +1,25 @@
+# R
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+*.Rproj
+
+# Build artifacts
+*.tar.gz
+*.zip
+..Rcheck/
+*.Rcheck/
+
+# Generated vignette/pkgdown output
+inst/doc/
+doc/
+docs/
+/Meta/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*~
+.idea/
+.vscode/

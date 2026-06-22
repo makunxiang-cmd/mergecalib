@@ -1,0 +1,15 @@
+^\.git$
+^\.gitignore$
+^mergecalib_.*\.(tar\.gz|zip)$
+^\.github$
+^\.Rproj\.user$
+^.*\.Rproj$
+^_pkgdown\.yml$
+^docs$
+^pkgdown$
+^cran-comments\.md$
+^CONTRIBUTING\.md$
+^CODE_OF_CONDUCT\.md$
+^AGENTS\.md$
+^\.DS_Store$
+^LICENSE\.md$
