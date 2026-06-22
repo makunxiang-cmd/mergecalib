@@ -122,6 +122,7 @@ mergecalib_agree <- function(agree = TRUE) {
     return(invisible(TRUE))
   }
   .mc_stop(
+    "mergecalib_error_internal",
     "You must accept the mergecalib disclaimer to fit a model. ",
     "Call mergecalib_agree(TRUE) or re-run and choose \"I agree\"."
   )

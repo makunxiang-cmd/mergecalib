@@ -5,7 +5,7 @@
       code <- match(as.character(x), as.character(explicit))
       if (anyNA(code)) {
         unknown <- unique(as.character(x)[is.na(code)])
-        .mc_stop("Ordinal variable `", group_name, "` has values not listed in level_orders: ",
+        .mc_stop("mergecalib_error_input", "Ordinal variable `", group_name, "` has values not listed in level_orders: ",
                  paste(unknown, collapse = ", "), ".")
       }
       return(as.numeric(code))
@@ -18,7 +18,25 @@
   as.character(x)
 }
 
-.distance_matrix <- function(data, spec, distance_weights = NULL) {
+.distance_spec_global_ordered_levels <- function(data, spec) {
+  out <- spec
+  if (is.null(out$level_orders)) out$level_orders <- list()
+  for (g in spec$ordered_groups) {
+    explicit <- g %in% names(out$level_orders) && !is.null(out$level_orders[[g]])
+    if (explicit) next
+
+    col <- spec$groups[[g]]
+    x <- data[[col]]
+    if (is.factor(x) && is.ordered(x)) {
+      out$level_orders[[g]] <- levels(x)
+    } else if (!is.numeric(x)) {
+      out$level_orders[[g]] <- sort(unique(as.character(x)), method = "radix")
+    }
+  }
+  out
+}
+
+.distance_matrix_block <- function(data, spec, distance_weights = NULL) {
   group_names <- names(spec$groups)
   if (is.null(distance_weights)) {
     distance_weights <- stats::setNames(rep(1, length(group_names)), group_names)
@@ -43,7 +61,55 @@
   out
 }
 
-.cluster_metrics <- function(members, data, spec, dist_mat) {
+.dist_lookup_block <- function(dist_mat, global_to_local) {
+  function(i, j) {
+    ii <- global_to_local[as.character(i)]
+    jj <- global_to_local[as.character(j)]
+    if (anyNA(ii) || anyNA(jj)) {
+      bad <- unique(c(as.character(i)[is.na(ii)], as.character(j)[is.na(jj)]))
+      .mc_stop(
+        "mergecalib_error_internal",
+        "Internal distance lookup received an out-of-block row index: ",
+        paste(bad, collapse = ", "),
+        "."
+      )
+    }
+    dist_mat[ii, jj]
+  }
+}
+
+.validate_candidate_integer <- function(x, name, minimum) {
+  if (!is.numeric(x) || length(x) != 1L || is.na(x) || !is.finite(x) ||
+      x != floor(x) || x < minimum) {
+    .mc_stop(
+      "mergecalib_error_input",
+      "`", name, "` must be a single integer greater than or equal to ",
+      minimum, "."
+    )
+  }
+  as.integer(x)
+}
+
+.validate_candidate_number <- function(x, name, minimum = 0, allow_infinite = TRUE) {
+  if (!is.numeric(x) || length(x) != 1L || is.na(x)) {
+    .mc_stop(
+      "mergecalib_error_input",
+      "`", name, "` must be a single numeric value greater than or equal to ",
+      minimum, "."
+    )
+  }
+  finite_ok <- is.finite(x) || (allow_infinite && is.infinite(x) && x > 0)
+  if (!finite_ok || x < minimum) {
+    .mc_stop(
+      "mergecalib_error_input",
+      "`", name, "` must be a single numeric value greater than or equal to ",
+      minimum, "."
+    )
+  }
+  as.numeric(x)
+}
+
+.cluster_metrics <- function(members, data, spec, dist) {
   n <- data[[spec$n]][members]
   w <- data[[spec$weight]][members]
   ids <- as.character(data[[spec$id]][members])
@@ -56,7 +122,7 @@
   anchor <- members[anchor_local]
   anchor_n <- n[anchor_local]
   moved_n <- total_n - anchor_n
-  demo_distance <- sum(pmax(n, 1) * dist_mat[members, anchor])
+  demo_distance <- sum(pmax(n, 1) * dist(members, anchor))
 
   grade_cols <- unname(spec$grades)
   totals <- vapply(grade_cols, function(col) sum(data[[col]][members]), numeric(1))
@@ -98,14 +164,14 @@
   )
 }
 
-.add_candidate <- function(store, members, data, spec, dist_mat,
+.add_candidate <- function(store, members, data, spec, dist,
                            max_unit_weight = Inf, max_weight_ratio = Inf,
                            force = FALSE) {
   members <- sort(unique(as.integer(members)))
   if (!length(members)) return(store)
   key <- paste(members, collapse = ":")
   if (!is.null(store[[key]])) return(store)
-  metric <- .cluster_metrics(members, data, spec, dist_mat)
+  metric <- .cluster_metrics(members, data, spec, dist)
   if (is.null(metric)) return(store)
   if (!force && (metric$unit_weight > max_unit_weight ||
                  metric$max_weight_ratio > max_weight_ratio)) {
@@ -116,7 +182,7 @@
 }
 
 .combination_candidates <- function(seed, pool, max_add, max_combinations,
-                                    dist_mat, data, spec) {
+                                    dist, data, spec) {
   if (!length(pool) || max_add < 1L) return(list())
   out <- list()
   rank_id <- 0L
@@ -124,7 +190,7 @@
     cmb <- utils::combn(pool, k, simplify = FALSE)
     if (!length(cmb)) next
     score <- vapply(cmb, function(z) {
-      sum(dist_mat[seed, z]) + 1e-9 * sum(data[[spec$n]][z])
+      sum(dist(seed, z)) + 1e-9 * sum(data[[spec$n]][z])
     }, numeric(1))
     ord <- order(score, vapply(cmb, function(z) paste(z, collapse = ":"), character(1)),
                  method = "radix")
@@ -173,15 +239,17 @@ generate_candidate_clusters <- function(
   include_province_fallback = FALSE
 ) {
   validate_merge_data(data, spec = spec)
-  max_cluster_size <- as.integer(max_cluster_size)
-  max_neighbors <- as.integer(max_neighbors)
-  max_combinations_per_cell <- as.integer(max_combinations_per_cell)
-  if (max_cluster_size < 2L || max_neighbors < 1L || max_combinations_per_cell < 1L) {
-    .mc_stop("Candidate parameters must satisfy max_cluster_size >= 2, max_neighbors >= 1, and max_combinations_per_cell >= 1.")
-  }
+  max_cluster_size <- .validate_candidate_integer(max_cluster_size, "max_cluster_size", 2L)
+  max_neighbors <- .validate_candidate_integer(max_neighbors, "max_neighbors", 1L)
+  max_combinations_per_cell <- .validate_candidate_integer(
+    max_combinations_per_cell, "max_combinations_per_cell", 1L
+  )
+  max_distance <- .validate_candidate_number(max_distance, "max_distance")
+  max_unit_weight <- .validate_candidate_number(max_unit_weight, "max_unit_weight")
+  max_weight_ratio <- .validate_candidate_number(max_weight_ratio, "max_weight_ratio")
 
   data <- as.data.frame(data, stringsAsFactors = FALSE)
-  dist_mat <- .distance_matrix(data, spec, distance_weights)
+  distance_spec <- .distance_spec_global_ordered_levels(data, spec)
   province <- as.character(data[[spec$province]])
   n <- data[[spec$n]]
   ids <- as.character(data[[spec$id]])
@@ -189,19 +257,29 @@ generate_candidate_clusters <- function(
 
   for (p in sort(unique(province), method = "radix")) {
     idx <- which(province == p)
-    pos <- idx[n[idx] > 0]
-    zero <- idx[n[idx] == 0]
+    block <- data[idx, , drop = FALSE]
+    dist_mat <- .distance_matrix_block(block, distance_spec, distance_weights)
+    local_to_global <- idx
+    global_to_local <- seq_along(idx)
+    names(global_to_local) <- as.character(idx)
+    dist_lookup <- .dist_lookup_block(dist_mat, global_to_local)
+    local_dist <- function(i, j) dist_mat[i, j]
+
+    n_block <- n[idx]
+    ids_block <- ids[idx]
+    pos <- which(n_block > 0)
+    zero <- which(n_block == 0)
 
     for (i in pos) {
-      store <- .add_candidate(store, i, data, spec, dist_mat,
+      store <- .add_candidate(store, local_to_global[i], data, spec, dist_lookup,
                               max_unit_weight, max_weight_ratio)
     }
 
-    seed_order <- idx[.lex_order(n[idx], ids[idx])]
+    seed_order <- .lex_order(n_block, ids_block)
     for (seed in seed_order) {
-      other <- setdiff(idx, seed)
+      other <- setdiff(seq_along(idx), seed)
       if (!length(other)) next
-      ord <- .lex_order(dist_mat[seed, other], n[other], ids[other])
+      ord <- .lex_order(dist_mat[seed, other], n_block[other], ids_block[other])
       pool <- other[ord]
       pool <- pool[dist_mat[seed, pool] <= max_distance]
       pool <- utils::head(pool, max_neighbors)
@@ -210,12 +288,13 @@ generate_candidate_clusters <- function(
         pool = pool,
         max_add = max_cluster_size - 1L,
         max_combinations = max_combinations_per_cell,
-        dist_mat = dist_mat,
-        data = data,
+        dist = local_dist,
+        data = block,
         spec = spec
       )
-      for (members in combos) {
-        store <- .add_candidate(store, members, data, spec, dist_mat,
+      for (members_local in combos) {
+        members_global <- local_to_global[members_local]
+        store <- .add_candidate(store, members_global, data, spec, dist_lookup,
                                 max_unit_weight, max_weight_ratio)
       }
     }
@@ -224,33 +303,35 @@ generate_candidate_clusters <- function(
     # positive-sample anchor in one deterministic fallback partition.
     if (length(zero)) {
       assigned <- list()
-      for (z in zero[.lex_order(ids[zero])]) {
-        ord <- .lex_order(dist_mat[z, pos], -n[pos], ids[pos])
+      for (z in zero[.lex_order(ids_block[zero])]) {
+        ord <- .lex_order(dist_mat[z, pos], -n_block[pos], ids_block[pos])
         anchor <- pos[ord[1]]
         key <- as.character(anchor)
         assigned[[key]] <- c(assigned[[key]], z)
       }
       for (key in names(assigned)) {
-        members <- c(as.integer(key), assigned[[key]])
-        metric <- .cluster_metrics(members, data, spec, dist_mat)
+        members_local <- c(as.integer(key), assigned[[key]])
+        members_global <- local_to_global[members_local]
+        metric <- .cluster_metrics(members_global, data, spec, dist_lookup)
         if (metric$unit_weight > max_unit_weight || metric$max_weight_ratio > max_weight_ratio) {
           .mc_stop(
+            "mergecalib_error_weight_bounds",
             "Zero-sample cells in province `", p, "` cannot be absorbed into a positive-sample cell under the current weight bounds. ",
             "Please relax max_unit_weight or max_weight_ratio."
           )
         }
-        store <- .add_candidate(store, members, data, spec, dist_mat,
+        store <- .add_candidate(store, members_global, data, spec, dist_lookup,
                                 max_unit_weight, max_weight_ratio, force = TRUE)
       }
     }
 
     if (isTRUE(include_province_fallback) && length(idx) > 1L) {
-      store <- .add_candidate(store, idx, data, spec, dist_mat,
+      store <- .add_candidate(store, idx, data, spec, dist_lookup,
                               max_unit_weight, max_weight_ratio)
     }
   }
 
-  if (!length(store)) .mc_stop("No candidate merged clusters were generated.")
+  if (!length(store)) .mc_stop("mergecalib_error_candidate", "No candidate merged clusters were generated.")
   keys <- sort(names(store), method = "radix")
   store <- store[keys]
   rows <- lapply(seq_along(store), function(i) {
@@ -282,10 +363,10 @@ generate_candidate_clusters <- function(
   cover <- tabulate(unlist(out$members), nbins = nrow(data))
   if (any(cover == 0L)) {
     bad <- data[[spec$id]][cover == 0L]
-    .mc_stop("The following original cells are not covered by any candidate cluster: ", paste(bad, collapse = ", "), ".")
+    .mc_stop("mergecalib_error_candidate", "The following original cells are not covered by any candidate cluster: ", paste(bad, collapse = ", "), ".")
   }
   if (any(out$n_total <= 0)) {
-    .mc_stop("Internal error: a candidate cluster with sample size 0 was produced.")
+    .mc_stop("mergecalib_error_internal", "Internal error: a candidate cluster with sample size 0 was produced.")
   }
   attr(out, "distance_weights") <- distance_weights
   out

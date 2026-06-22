@@ -25,6 +25,25 @@
   list(feasible = TRUE, delta = high, solve = best, history = history)
 }
 
+.validate_objective_order <- function(objective_order) {
+  if (!is.character(objective_order) || !length(objective_order) ||
+      anyNA(objective_order) || any(!nzchar(objective_order))) {
+    .mc_stop(
+      "mergecalib_error_input",
+      "`objective_order` must be a non-empty character vector without missing values."
+    )
+  }
+  duplicates <- unique(objective_order[duplicated(objective_order)])
+  if (length(duplicates)) {
+    .mc_stop(
+      "mergecalib_error_input",
+      "`objective_order` must not contain duplicate names: ",
+      paste(duplicates, collapse = ", "), "."
+    )
+  }
+  objective_order
+}
+
 .lexicographic_solve <- function(data, targets, candidates, spec, delta,
                                  objective_order, solver_control,
                                  lex_tolerance_abs, lex_tolerance_rel,
@@ -37,11 +56,11 @@
 
   for (stage in objective_order) {
     if (!stage %in% names(candidates)) {
-      .mc_stop("Unknown lexicographic objective column: `", stage, "`.")
+      .mc_stop("mergecalib_error_input", "Unknown lexicographic objective column: `", stage, "`.")
     }
     objective <- as.numeric(candidates[[stage]])
     if (any(!is.finite(objective))) {
-      .mc_stop("Lexicographic objective `", stage, "` contains non-finite values.")
+      .mc_stop("mergecalib_error_input", "Lexicographic objective `", stage, "` contains non-finite values.")
     }
     if (all(abs(objective) <= .Machine$double.eps)) {
       stage_results[[stage]] <- list(
@@ -59,13 +78,13 @@
     )
     sol <- .solve_highs(model, solver_control, start = current_start)
     if (!.solution_available(sol, nrow(candidates))) {
-      .mc_stop("Lexicographic stage `", stage, "` did not return a feasible solution. Solver status: ",
+      .mc_stop("mergecalib_error_solver", "Lexicographic stage `", stage, "` did not return a feasible solution. Solver status: ",
                paste(sol$status_message, collapse = " "), ".")
     }
     x <- as.numeric(sol$primal_solution > 0.5)
     check <- .check_solution_constraints(model, x)
     if (!check$valid) {
-      .mc_stop("The solver returned a constraint-violating solution at stage `", stage, "`. Maximum violation: ",
+      .mc_stop("mergecalib_error_solver", "The solver returned a constraint-violating solution at stage `", stage, "`. Maximum violation: ",
                max(check$max_lower_violation, check$max_upper_violation), ".")
     }
     value <- sum(objective * x)
@@ -97,6 +116,13 @@
       membership = membership
     )
     last_solution <- .solve_highs(last_model, solver_control, start = current_start)
+  }
+  if (!.solution_available(last_solution, nrow(candidates))) {
+    .mc_stop(
+      "mergecalib_error_solver",
+      "Final optimization did not return a feasible solution. Solver status: ",
+      paste(last_solution$status_message, collapse = " "), "."
+    )
   }
   list(solution = last_solution, model = last_model, stages = stage_results, cuts = cuts)
 }
@@ -143,9 +169,11 @@ fit_merge_calibration <- function(
 ) {
   .assert_installed("highs")
   .mc_require_consent()
+  objective_order <- .validate_objective_order(objective_order)
+  solver_control <- .validate_solver_control(solver_control)
   validate_merge_data(data, targets, spec)
   if (!is.list(candidate_levels) || !length(candidate_levels)) {
-    .mc_stop("`candidate_levels` must be a non-empty list.")
+    .mc_stop("mergecalib_error_input", "`candidate_levels` must be a non-empty list.")
   }
   if (is.null(names(candidate_levels))) {
     names(candidate_levels) <- paste0("level", seq_along(candidate_levels))
@@ -155,12 +183,12 @@ fit_merge_calibration <- function(
   }
   if (!is.numeric(max_delta) || length(max_delta) != 1L ||
       !is.finite(max_delta) || max_delta < 0 || max_delta > 1) {
-    .mc_stop("`max_delta` must be a single number between 0 and 1.")
+    .mc_stop("mergecalib_error_input", "`max_delta` must be a single number between 0 and 1.")
   }
 
   data <- as.data.frame(data, stringsAsFactors = FALSE)
   if (".mergecalib_original_row__" %in% names(data)) {
-    .mc_stop("The input data contains the reserved column `.mergecalib_original_row__`; please rename it first.")
+    .mc_stop("mergecalib_error_input", "The input data contains the reserved column `.mergecalib_original_row__`; please rename it first.")
   }
   data$.mergecalib_original_row__ <- seq_len(nrow(data))
   ord <- .lex_order(
@@ -216,6 +244,7 @@ fit_merge_calibration <- function(
   } else {
     if (!isTRUE(relax_targets)) {
       .mc_stop(
+        "mergecalib_error_infeasible",
         "The original target intervals are infeasible at every candidate-expansion level. ",
         "Set relax_targets = TRUE to search for the minimum uniform relaxation."
       )
@@ -229,6 +258,7 @@ fit_merge_calibration <- function(
     relaxation_history <- relaxed$history
     if (!relaxed$feasible) {
       .mc_stop(
+        "mergecalib_error_infeasible",
         "The model remains infeasible even after relaxing every target interval uniformly on both sides by ", max_delta,
         ". You need to widen the candidate-merge range, relax the weight bounds, or re-check the targets."
       )
@@ -248,13 +278,13 @@ fit_merge_calibration <- function(
   )
   x <- as.numeric(lex$solution$primal_solution > 0.5)
   selected <- which(x == 1)
-  if (!length(selected)) .mc_stop("Internal error: the final solution selected no merged clusters.")
+  if (!length(selected)) .mc_stop("mergecalib_error_internal", "Internal error: the final solution selected no merged clusters.")
   if (any(chosen_candidates$n_total[selected] <= 0)) {
-    .mc_stop("Internal error: the final solution contains a merged cluster with sample size 0.")
+    .mc_stop("mergecalib_error_internal", "Internal error: the final solution contains a merged cluster with sample size 0.")
   }
   cover <- tabulate(unlist(chosen_candidates$members[selected]), nbins = nrow(data))
   if (any(cover != 1L)) {
-    .mc_stop("Internal error: the final plan does not form an exact one-time cover of the original cells.")
+    .mc_stop("mergecalib_error_internal", "Internal error: the final plan does not form an exact one-time cover of the original cells.")
   }
 
   fit <- list(
@@ -281,7 +311,8 @@ fit_merge_calibration <- function(
   fit$outputs <- .build_fit_outputs(fit)
   audit <- audit_merge_fit(fit)
   if (!isTRUE(audit$valid)) {
-    .mc_stop("Final audit failed: ", paste(audit$issues, collapse = "; "), ".")
+    .mc_stop("mergecalib_error_internal", "Final audit failed: ", paste(audit$issues, collapse = "; "), ".")
   }
+  .emit_fit_warnings(fit)
   fit
 }

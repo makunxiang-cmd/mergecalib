@@ -21,13 +21,13 @@ merge_spec <- function(
   level_orders = list()
 ) {
   if (is.null(names(grades)) || any(names(grades) == "")) {
-    .mc_stop("`grades` must be a named character vector, e.g. c(A='A', B='B', C='C', D='D').")
+    .mc_stop("mergecalib_error_spec", "`grades` must be a named character vector, e.g. c(A='A', B='B', C='C', D='D').")
   }
   if (is.null(names(groups)) || any(names(groups) == "")) {
-    .mc_stop("`groups` must be a named character vector.")
+    .mc_stop("mergecalib_error_spec", "`groups` must be a named character vector.")
   }
   if (!all(ordered_groups %in% names(groups))) {
-    .mc_stop("`ordered_groups` must be a subset of the names of `groups`.")
+    .mc_stop("mergecalib_error_spec", "`ordered_groups` must be a subset of the names of `groups`.")
   }
   structure(
     list(

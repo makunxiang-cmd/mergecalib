@@ -74,7 +74,7 @@
   nr_cells <- nrow(data)
   nt <- nrow(targets)
   if (is.null(objective)) objective <- rep(0, nc)
-  if (length(objective) != nc) .mc_stop("Internal error: objective length does not match the number of candidate clusters.")
+  if (length(objective) != nc) .mc_stop("mergecalib_error_internal", "Internal error: objective length does not match the number of candidate clusters.")
 
   incidence <- .candidate_incidence(candidates, nr_cells)
   coef <- .target_coefficients(
@@ -161,9 +161,8 @@
   )
 }
 
-.solve_highs <- function(model, solver_control = list(), start = NULL) {
-  .assert_installed("highs")
-  defaults <- list(
+.highs_default_control <- function() {
+  list(
     threads = 1L,
     time_limit = Inf,
     log_to_console = FALSE,
@@ -173,19 +172,114 @@
     mip_rel_gap = 1e-7,
     mip_abs_gap = 1e-7
   )
+}
+
+.highs_available_option_names <- function() {
+  out <- tryCatch(
+    highs::highs_available_solver_options(),
+    error = function(e) NULL
+  )
+  if (is.data.frame(out)) {
+    if ("option" %in% names(out)) return(as.character(out$option))
+    if ("name" %in% names(out)) return(as.character(out$name))
+  }
+  if (is.list(out)) {
+    if (!is.null(out$option)) return(as.character(out$option))
+    if (!is.null(out$name)) return(as.character(out$name))
+    if (!is.null(names(out))) return(names(out))
+  }
+  character()
+}
+
+.highs_string_option_values <- function(option) {
+  switch(
+    option,
+    presolve = c("off", "choose", "on"),
+    solver = c("choose", "simplex", "ipm", "ipx", "pdlp"),
+    parallel = c("off", "choose", "on"),
+    run_crossover = c("off", "choose", "on"),
+    ranging = c("off", "on"),
+    mip_lp_solver = c("choose", "simplex", "ipm", "ipx"),
+    mip_ipm_solver = c("choose", "simplex", "ipm", "ipx"),
+    NULL
+  )
+}
+
+.validate_solver_control <- function(solver_control) {
+  if (is.null(solver_control)) return(list())
+  if (!is.list(solver_control)) {
+    .mc_stop("mergecalib_error_input", "`solver_control` must be a named list.")
+  }
+  if (!length(solver_control)) return(solver_control)
+
+  nms <- names(solver_control)
+  if (is.null(nms) || anyNA(nms) || any(!nzchar(nms))) {
+    .mc_stop("mergecalib_error_input", "`solver_control` entries must be named.")
+  }
+  duplicates <- unique(nms[duplicated(nms)])
+  if (length(duplicates)) {
+    .mc_stop(
+      "mergecalib_error_input",
+      "`solver_control` entries must not be duplicated: ",
+      paste(duplicates, collapse = ", "), "."
+    )
+  }
+
+  allowed <- .highs_available_option_names()
+  if (length(allowed)) {
+    unknown <- setdiff(nms, allowed)
+    if (length(unknown)) {
+      .mc_stop(
+        "mergecalib_error_input",
+        "Unknown `solver_control` option",
+        if (length(unknown) > 1L) "s" else "",
+        ": ", paste(unknown, collapse = ", "), "."
+      )
+    }
+  }
+  for (option in nms) {
+    allowed_values <- .highs_string_option_values(option)
+    if (is.null(allowed_values)) next
+    value <- solver_control[[option]]
+    if (!is.character(value) || length(value) != 1L || is.na(value) ||
+        !value %in% allowed_values) {
+      .mc_stop(
+        "mergecalib_error_input",
+        "`solver_control$", option, "` must be one of: ",
+        paste(allowed_values, collapse = ", "), "."
+      )
+    }
+  }
+  solver_control
+}
+
+.solve_highs <- function(model, solver_control = list(), start = NULL) {
+  .assert_installed("highs")
+  defaults <- .highs_default_control()
+  solver_control <- .validate_solver_control(solver_control)
   ctrl <- utils::modifyList(defaults, solver_control)
-  high_ctrl <- do.call(highs::highs_control, ctrl)
-  highs::highs_solve(
-    L = model$L,
-    lower = model$lower,
-    upper = model$upper,
-    A = model$A,
-    lhs = model$lhs,
-    rhs = model$rhs,
-    types = model$types,
-    maximum = FALSE,
-    start = start,
-    control = high_ctrl
+  high_ctrl <- tryCatch(
+    do.call(highs::highs_control, ctrl),
+    error = function(e) {
+      .mc_stop("mergecalib_error_input", "Invalid `solver_control`: ", conditionMessage(e))
+    }
+  )
+  tryCatch(
+    highs::highs_solve(
+      L = model$L,
+      lower = model$lower,
+      upper = model$upper,
+      A = model$A,
+      lhs = model$lhs,
+      rhs = model$rhs,
+      types = model$types,
+      maximum = FALSE,
+      start = start,
+      control = high_ctrl
+    ),
+    error = function(e) {
+      .mc_stop("mergecalib_error_solver", "HiGHS solve failed: ", conditionMessage(e))
+    }
   )
 }
 
@@ -213,13 +307,30 @@
     membership = membership
   )
   sol <- .solve_highs(model, solver_control)
-  available <- .solution_available(sol, nrow(candidates))
-  valid <- FALSE
   check <- NULL
-  if (available) {
-    x <- as.numeric(sol$primal_solution > 0.5)
-    check <- .check_solution_constraints(model, x)
-    valid <- isTRUE(check$valid)
+  if (.status_is_infeasible(sol)) {
+    return(list(feasible = FALSE, solution = sol, model = model, check = check))
   }
-  list(feasible = available && valid, solution = sol, model = model, check = check)
+
+  available <- .solution_available(sol, nrow(candidates))
+  if (!available) {
+    status <- .status_text(sol)
+    if (!nzchar(status)) status <- "unknown"
+    .mc_stop(
+      "mergecalib_error_solver",
+      "Feasibility solve did not return a feasible solution. Solver status: ",
+      status, "."
+    )
+  }
+
+  x <- as.numeric(sol$primal_solution > 0.5)
+  check <- .check_solution_constraints(model, x)
+  if (!isTRUE(check$valid)) {
+    .mc_stop(
+      "mergecalib_error_solver",
+      "The solver returned a constraint-violating feasibility solution. Maximum violation: ",
+      max(check$max_lower_violation, check$max_upper_violation), "."
+    )
+  }
+  list(feasible = TRUE, solution = sol, model = model, check = check)
 }

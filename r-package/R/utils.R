@@ -1,11 +1,3 @@
-.mc_stop <- function(..., call. = FALSE) {
-  stop(..., call. = call.)
-}
-
-.mc_warn <- function(..., call. = FALSE) {
-  warning(..., call. = call.)
-}
-
 .is_integerish <- function(x, tol = 1e-8) {
   is.numeric(x) && all(is.finite(x)) && all(abs(x - round(x)) <= tol)
 }
@@ -60,6 +52,7 @@
 .assert_installed <- function(package) {
   if (!requireNamespace(package, quietly = TRUE)) {
     .mc_stop(
+      "mergecalib_error_input",
       "The R package '", package, "' is required to solve the model. ",
       "Please run install.packages(\"", package, "\")."
     )
@@ -71,9 +64,20 @@
   !is.null(x) && length(x) == nvar && all(is.finite(x))
 }
 
+.status_text <- function(sol) {
+  values <- unlist(list(sol$status_message, sol$status), use.names = FALSE)
+  values <- as.character(values[!is.na(values)])
+  paste(values, collapse = " ")
+}
+
 .status_is_optimal <- function(sol) {
-  msg <- tolower(paste(sol$status_message, collapse = " "))
+  msg <- tolower(.status_text(sol))
   grepl("optimal", msg, fixed = TRUE)
+}
+
+.status_is_infeasible <- function(sol) {
+  msg <- tolower(.status_text(sol))
+  grepl("infeasible", msg, fixed = TRUE)
 }
 
 .compact_number <- function(x, digits = 6) {
