@@ -1,129 +1,152 @@
-# AGENTS.md — handoff guide for mergecalib
+# AGENTS.md - handoff guide for mergecalib
 
-This file orients an AI agent or a new developer taking over `mergecalib`. Read
-it before making changes. It is intentionally specific about the invariants this
-package must preserve.
+This is the canonical handoff file for AI agents and new maintainers taking
+over `mergecalib`. Read it before making changes.
 
-## 1. What the package does
+## 1. Repository Boundary
 
-`mergecalib` builds a deterministic, **within-province** plan that merges
-demographic cells so that weighted outcome proportions (grades A/B/C/D) for
-provincial and national populations fall inside user-supplied intervals. The
-core is a set-partitioning mixed-integer linear program (MILP) solved with
-HiGHS, followed by a lexicographic minimisation of secondary objectives.
+The GitHub repository root is the project root:
 
-The single most important domain rule: **every final merged cell must have a
-strictly positive sample size**, and the package must never invent observations
-or borrow sample across provinces by default.
-
-## 2. Repository layout
-
-```
-DESCRIPTION, NAMESPACE        package metadata and exports (NAMESPACE is hand-maintained;
-                              keep it in sync with roxygen if you run roxygen2)
-R/                            source
-  spec.R        merge_spec(), schema helpers, default_candidate_levels()
-  validate.R    validate_merge_data() + .validate_targets()
-  candidates.R  generate_candidate_clusters() and cluster metrics
-  model.R       MILP construction (.build_milp) and HiGHS solve (.solve_highs)
-  fit.R         fit_merge_calibration() orchestration, relaxation, lexicographic stages
-  results.R     output tables, calculate_results(), audit_merge_fit(), export_merge_results()
-  print.R       print/summary/plot S3 methods
-  consent.R     disclaimer + session consent gate (mergecalib_disclaimer/agree)
-  zzz.R         .onAttach startup banner
-  utils.R       small internal helpers (.mc_stop, wildcards, ordering, etc.)
-  example.R     example_merge_data(), example_merge_targets()
-man/            hand-written .Rd files (NOT generated with the usual roxygen header)
-tests/testthat/ unit tests (testthat edition 3)
-vignettes/      mergecalib.Rmd (English)
-inst/extdata/   example CSVs
-inst/DISCLAIMER.md   canonical disclaimer text (read by consent.R)
-.github/        CI (R-CMD-check, pkgdown), issue/PR templates
-_pkgdown.yml    pkgdown site config
-cran-comments.md submission notes
+```text
+/Users/makunxiang/Documents/AI编程/R Pack/mergecalib
 ```
 
-Note: the broader user folder also contains `Rscripts/`, `docs/`, and
-`package/` (a built tarball) **outside** this package directory. The git
-repository root is this package directory.
+The R package itself lives in `r-package/`. Keep the repository root clean:
+visible root files should be limited to `README.md`, `AGENTS.md`, and
+`项目说明与发展方向_中文.md`; other project content belongs in folders.
 
-## 3. Hard invariants — do not break these
+## 2. What The Package Does
 
-1. **Positive final sample size.** Zero-sample cells can never be standalone
-   candidates; each must be absorbed into a same-province positive cell. The
-   deterministic zero-absorption fallback in `candidates.R` guarantees a
-   feasible partition exists. `audit_merge_fit()` re-checks `final_n > 0`.
-2. **No fabricated sample / no default cross-province borrowing.** If a province
-   is all-zero, or a target population has zero observed sample, the package
-   errors out (see `validate.R`) instead of producing a result.
-3. **Determinism.** Fixed lexicographic ordering, single-threaded HiGHS, fixed
-   random seed, parallel off (see defaults in `.solve_highs` and `fit.R`).
-   Identical inputs + same version => identical output. Do not introduce
-   randomness into defaults.
-4. **English + ASCII-only R source.** All user-facing messages are English. The
-   only non-ASCII concept (the Chinese "national" wildcard) is encoded as a
-   `\uXXXX` escape in `R/utils.R` (`.mc_wildcards`). Keep source ASCII so CRAN
-   raises no non-ASCII NOTE.
-5. **Conservation.** Sample size, total weight, and per-grade counts are
-   conserved by merging; `audit_merge_fit()` enforces this.
+`mergecalib` builds deterministic within-province cell-merging plans for
+demographic cell data. It calibrates weighted outcome proportions for provincial
+and national target populations against user-supplied intervals.
 
-## 4. The disclaimer / consent gate
+The computational core is:
 
-`fit_merge_calibration()` calls `.mc_require_consent()` after checking that HiGHS
-is installed. Behaviour:
+1. deterministic candidate-cluster generation;
+2. set-partitioning mixed-integer linear programming with HiGHS;
+3. optional minimum uniform target relaxation;
+4. lexicographic minimization of secondary objectives;
+5. final audit of exact cover, conservation, and positive final sample size.
 
-- If `getOption("mergecalib.agreed")` is `TRUE`, proceed silently.
-- If **non-interactive** (R CMD check, scripts, CI, vignettes): proceed, emitting
-  a one-time `message()`. This must never block — CRAN checks depend on it.
-- If **interactive** and not yet agreed: show the banner and `utils::menu()`;
-  agreeing sets the session option, declining errors.
+The single most important domain rule is that every final merged cell must have
+strictly positive sample size. The package must never invent observations or
+borrow sample across provinces by default.
 
-Never make this gate write to disk or block non-interactive runs. The canonical
-text lives in `inst/DISCLAIMER.md`; `consent.R` has a built-in fallback copy —
-keep them consistent if you edit the wording.
+## 3. Documentation Map
 
-## 5. Build, document, test
+- `README.md` - root project map and quick commands.
+- `r-package/README.md` - package-facing installation, example, input format,
+  outputs, and scope.
+- `docs/maintainer/README.md` - maintainer documentation index.
+- `docs/maintainer/PROJECT_OVERVIEW.md` - architecture, solver flow, outputs,
+  and source map.
+- `docs/maintainer/DEVELOPMENT.md` - setup, test, documentation, release, and
+  CRAN notes.
+- `docs/maintainer/ROADMAP_v0.2.0.md` - staged technical roadmap.
+- `docs/maintainer/GITHUB_PUBLISHING.md` - remote and push workflow.
+- `docs/user-manual/` - rendered user manuals and PDFs.
+- `examples/` - runnable scripts outside the R package source.
+- `r-package/vignettes/mergecalib.Rmd` - package vignette.
+- `r-package/cran-comments.md` - CRAN submission notes.
 
-R is required (not bundled in some sandboxes). Typical loop:
+## 4. Source Map
+
+```text
+r-package/DESCRIPTION, NAMESPACE        package metadata and exports
+r-package/R/spec.R                      merge_spec(), schema helpers
+r-package/R/validate.R                  data and target validation
+r-package/R/candidates.R                candidate clusters and metrics
+r-package/R/model.R                     MILP construction and HiGHS solve
+r-package/R/fit.R                       orchestration and lexicographic solve
+r-package/R/results.R                   outputs, summaries, audit, export
+r-package/R/print.R                     print, summary, and plot methods
+r-package/R/consent.R                   disclaimer and consent gate
+r-package/R/zzz.R                       .onAttach startup banner
+r-package/R/utils.R                     internal helpers and wildcard matching
+r-package/R/example.R                   example data and targets
+r-package/tests/testthat/               unit tests
+r-package/man/                          hand-written Rd files
+r-package/inst/DISCLAIMER.md            canonical disclaimer text
+.github/                                CI and GitHub templates
+docs/maintainer/                        maintainer-facing documentation
+```
+
+## 5. Hard Invariants
+
+Do not break these:
+
+1. Positive final sample size. Zero-sample cells cannot stand alone; they must
+   be absorbed into same-province positive-sample clusters.
+2. No fabricated sample and no default cross-province borrowing. All-zero
+   provinces and unestimable target populations must error rather than produce
+   pseudo-results.
+3. Determinism. Keep fixed ordering, single-threaded HiGHS, fixed random seed,
+   parallel off by default, and lexicographic objectives.
+4. Conservation. Merging must preserve sample size, total weight, and per-grade
+   counts. `audit_merge_fit()` is the final guard.
+5. English user-facing package messages and ASCII-only R source. The Chinese
+   national wildcard is encoded as escaped Unicode in `R/utils.R`.
+
+## 6. Consent Gate
+
+`fit_merge_calibration()` calls `.mc_require_consent()` before solving.
+
+- `getOption("mergecalib.agreed") == TRUE` proceeds silently.
+- Non-interactive sessions proceed with a one-time message and must never block.
+- Interactive sessions show the disclaimer and ask for session consent.
+
+Never make this gate write to disk. Keep `R/consent.R` and
+`inst/DISCLAIMER.md` consistent if the wording changes.
+
+## 7. Build, Test, Check
+
+Typical local loop:
 
 ```r
+setwd("r-package")
 devtools::load_all()
-devtools::document()   # only if you change roxygen; then reconcile NAMESPACE
 devtools::test()
 devtools::check()
 ```
 
-Release-grade:
+Release-grade loop:
 
 ```sh
+cd r-package
 R CMD build .
 R CMD check --as-cran mergecalib_0.1.0.tar.gz
 ```
 
-Tests assume HiGHS is available for the fit test (`skip_if_not_installed`).
-Validation tests match **English** error substrings — if you reword an error,
-update `tests/testthat/test-validation.R`.
+If `highs` is not installed, solver-backed tests are skipped. Validation tests
+match English error substrings, so rewording errors can require test updates.
 
-## 6. Roadmap toward CRAN (priority order)
+## 8. Manual Documentation
 
-1. Run `R CMD check --as-cran` locally and on win-builder; drive to
-   0/0/0 (a "New submission" NOTE is expected). Fill in `cran-comments.md`.
-2. Confirm man pages match the code signatures (they are hand-written; if you
-   adopt roxygen2 fully, regenerate and remove hand-written `.Rd`s).
-3. Add an ORCID and a `Date` field to `DESCRIPTION` if desired; verify the
-   maintainer email is reachable (CRAN emails it).
-4. Consider adding `\value` and richer `@examples` (wrapped in
-   `\dontrun{}` where they need the solver) to every exported function — CRAN
-   requires `\value` on all exported functions.
-5. Optionally add more tests (relaxation path, export round-trip,
-   `calculate_results` by multiple dims) to raise coverage.
-6. Tag `v0.1.0`, let CI go green, then submit via `devtools::release()`.
+`man/*.Rd` files are hand-maintained. If you add or change an exported function,
+update all of these together:
 
-## 7. Common pitfalls
+1. the R function;
+2. `NAMESPACE`;
+3. the matching `man/*.Rd`;
+4. examples, README, vignette, and tests when behavior changes.
 
-- Editing a message in `R/` but forgetting the matching test assertion.
-- Reintroducing non-ASCII text (Chinese comments/strings) — keep it ASCII.
-- Changing candidate-generation order or solver threads and breaking
-  reproducibility.
-- Forgetting that `man/*.Rd` are hand-maintained; a new exported function needs
-  a new `.Rd` and a `NAMESPACE` export.
+Do not run roxygen2 casually unless you intend to inspect and reconcile the
+generated `man/` and `NAMESPACE` changes.
+
+## 9. CodeGraph
+
+The local MCP environment may expose CodeGraph tools. Prefer CodeGraph for
+structural questions when an index exists. In this checkout, CodeGraph was not
+initialized when this handoff was written; if the tool reports that
+`.codegraph/` is missing, ask before running `codegraph init -i`.
+
+## 10. Common Pitfalls
+
+- Reintroducing non-ASCII strings into R source.
+- Changing candidate ordering, solver thread defaults, or random seeds and
+  breaking reproducibility.
+- Editing error text without updating validation tests.
+- Adding exported functions without synchronized `.Rd` and `NAMESPACE` updates.
+- Treating files outside this Git repository as automatically part of the
+  package source.

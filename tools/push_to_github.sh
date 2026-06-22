@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# Push mergecalib to GitHub. Run from the package root.
+# Push mergecalib to GitHub. Run from the repository root.
 # The remote 'origin' is already set to:
 #   https://github.com/makunxiang-cmd/mergecalib.git
 set -e
@@ -7,7 +7,7 @@ set -e
 REMOTE_URL="https://github.com/makunxiang-cmd/mergecalib.git"
 
 if ! git rev-parse --git-dir >/dev/null 2>&1; then
-  echo "Not a git repository. Run this from the package root." >&2
+  echo "Not a git repository. Run this from the repository root." >&2
   exit 1
 fi
 

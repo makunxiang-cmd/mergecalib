@@ -1,21 +1,29 @@
-# R
-.Rproj.user
+# R session and project files
+.Rproj.user/
 .Rhistory
 .RData
 .Ruserdata
 *.Rproj
 
-# Build artifacts
+# R package build artifacts
 *.tar.gz
 *.zip
-..Rcheck/
 *.Rcheck/
+r-package/..Rcheck/
+r-package/*.Rcheck/
+r-package/inst/doc/
+r-package/doc/
+r-package/docs/
+r-package/Meta/
 
-# Generated vignette/pkgdown output
-inst/doc/
-doc/
-docs/
-/Meta/
+# Local-only distribution outputs
+dist/*
+!dist/.gitkeep
+
+# Legacy local directories
+Rscripts/
+package/
+mergecalib_sourcecode/
 
 # OS / editor
 .DS_Store
