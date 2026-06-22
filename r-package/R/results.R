@@ -154,6 +154,12 @@
   )
 }
 
+.assert_merge_fit <- function(fit) {
+  if (!inherits(fit, "mergecalib_fit")) {
+    .mc_stop("mergecalib_error_input", "`fit` must be a mergecalib_fit object.")
+  }
+  fit
+}
 
 #' Calculate initial and final proportions by arbitrary dimensions
 #'
@@ -162,11 +168,11 @@
 #' @return Long-form data frame with one row per group and grade.
 #' @export
 calculate_results <- function(fit, by) {
-  if (!inherits(fit, "mergecalib_fit")) .mc_stop("mergecalib_error_internal", "`fit` must be a mergecalib_fit object.")
+  fit <- .assert_merge_fit(fit)
   contrib <- fit$outputs$contributions
   spec <- fit$spec
   if (!length(by) || !all(by %in% names(contrib))) {
-    .mc_stop("mergecalib_error_internal", "`by` must be one or more columns present in the original data.")
+    .mc_stop("mergecalib_error_input", "`by` must be one or more columns present in the original data.")
   }
   grade_names <- names(spec$grades)
   contrib$.sample_n <- contrib[[spec$n]]
@@ -253,33 +259,49 @@ calculate_results <- function(fit, by) {
 #' Original-cell to final-cluster mapping
 #' @param fit A fitted model.
 #' @export
-cell_map <- function(fit) fit$outputs$cell_map
+cell_map <- function(fit) {
+  fit <- .assert_merge_fit(fit)
+  fit$outputs$cell_map
+}
 
 #' Ordered merge operations
 #' @param fit A fitted model.
 #' @export
-merge_plan <- function(fit) fit$outputs$merge_steps
+merge_plan <- function(fit) {
+  fit <- .assert_merge_fit(fit)
+  fit$outputs$merge_steps
+}
 
 #' Final positive-sample merged cells
 #' @param fit A fitted model.
 #' @export
-final_cells <- function(fit) fit$outputs$final_cells
+final_cells <- function(fit) {
+  fit <- .assert_merge_fit(fit)
+  fit$outputs$final_cells
+}
 
 #' Target audit results
 #' @param fit A fitted model.
 #' @export
-target_results <- function(fit) .compute_target_results(fit)
+target_results <- function(fit) {
+  fit <- .assert_merge_fit(fit)
+  .compute_target_results(fit)
+}
 
 #' Province-level grade proportions
 #' @param fit A fitted model.
 #' @export
-province_results <- function(fit) calculate_results(fit, fit$spec$province)
+province_results <- function(fit) {
+  fit <- .assert_merge_fit(fit)
+  calculate_results(fit, fit$spec$province)
+}
 
 #' National fine-cell grade proportions
 #' @param fit A fitted model.
 #' @param include_zero Whether to include original demographic combinations with zero observed sample.
 #' @export
 national_cell_results <- function(fit, include_zero = FALSE) {
+  fit <- .assert_merge_fit(fit)
   out <- calculate_results(fit, unname(fit$spec$groups))
   if (!isTRUE(include_zero)) out <- out[out$sample_n > 0, , drop = FALSE]
   rownames(out) <- NULL
@@ -293,7 +315,7 @@ national_cell_results <- function(fit, include_zero = FALSE) {
 #' @return A list containing `valid`, `issues`, and diagnostics.
 #' @export
 audit_merge_fit <- function(fit, tolerance = 1e-6) {
-  if (!inherits(fit, "mergecalib_fit")) .mc_stop("mergecalib_error_internal", "`fit` must be a mergecalib_fit object.")
+  fit <- .assert_merge_fit(fit)
   issues <- character()
   final <- fit$outputs$final_cells
   map <- fit$outputs$cell_map
@@ -367,12 +389,12 @@ export_merge_results <- function(
   include_zero_national = FALSE,
   save_fit = TRUE
 ) {
-  if (!inherits(fit, "mergecalib_fit")) .mc_stop("mergecalib_error_internal", "`fit` must be a mergecalib_fit object.")
+  fit <- .assert_merge_fit(fit)
   if (!is.character(path) || length(path) != 1L || !nzchar(path)) {
-    .mc_stop("mergecalib_error_internal", "`path` must be a single non-empty directory path.")
+    .mc_stop("mergecalib_error_input", "`path` must be a single non-empty directory path.")
   }
   if (!dir.exists(path)) dir.create(path, recursive = TRUE, showWarnings = FALSE)
-  if (!dir.exists(path)) .mc_stop("mergecalib_error_internal", "Could not create the output directory: ", path, ".")
+  if (!dir.exists(path)) .mc_stop("mergecalib_error_input", "Could not create the output directory: ", path, ".")
 
   tables <- list(
     cell_map = cell_map(fit),
@@ -391,7 +413,7 @@ export_merge_results <- function(
     if (save_fit && file.exists(rds_file)) rds_file
   )
   if (length(existing) && !isTRUE(overwrite)) {
-    .mc_stop("mergecalib_error_internal", "The following files already exist; set overwrite = TRUE to replace them: ",
+    .mc_stop("mergecalib_error_input", "The following files already exist; set overwrite = TRUE to replace them: ",
              paste(basename(existing), collapse = ", "), ".")
   }
   for (nm in names(tables)) {

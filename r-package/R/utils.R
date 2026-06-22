@@ -52,7 +52,7 @@
 .assert_installed <- function(package) {
   if (!requireNamespace(package, quietly = TRUE)) {
     .mc_stop(
-      "mergecalib_error_internal",
+      "mergecalib_error_input",
       "The R package '", package, "' is required to solve the model. ",
       "Please run install.packages(\"", package, "\")."
     )

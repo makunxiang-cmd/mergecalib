@@ -54,3 +54,10 @@ test_that("merge_spec validation failures use spec class", {
     class = "mergecalib_error_spec"
   )
 })
+
+test_that("result accessors reject non-fit objects with input class", {
+  expect_error(
+    audit_merge_fit(list()),
+    class = "mergecalib_error_input"
+  )
+})

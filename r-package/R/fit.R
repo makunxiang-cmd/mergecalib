@@ -37,11 +37,11 @@
 
   for (stage in objective_order) {
     if (!stage %in% names(candidates)) {
-      .mc_stop("mergecalib_error_internal", "Unknown lexicographic objective column: `", stage, "`.")
+      .mc_stop("mergecalib_error_input", "Unknown lexicographic objective column: `", stage, "`.")
     }
     objective <- as.numeric(candidates[[stage]])
     if (any(!is.finite(objective))) {
-      .mc_stop("mergecalib_error_internal", "Lexicographic objective `", stage, "` contains non-finite values.")
+      .mc_stop("mergecalib_error_input", "Lexicographic objective `", stage, "` contains non-finite values.")
     }
     if (all(abs(objective) <= .Machine$double.eps)) {
       stage_results[[stage]] <- list(
@@ -59,13 +59,13 @@
     )
     sol <- .solve_highs(model, solver_control, start = current_start)
     if (!.solution_available(sol, nrow(candidates))) {
-      .mc_stop("mergecalib_error_internal", "Lexicographic stage `", stage, "` did not return a feasible solution. Solver status: ",
+      .mc_stop("mergecalib_error_solver", "Lexicographic stage `", stage, "` did not return a feasible solution. Solver status: ",
                paste(sol$status_message, collapse = " "), ".")
     }
     x <- as.numeric(sol$primal_solution > 0.5)
     check <- .check_solution_constraints(model, x)
     if (!check$valid) {
-      .mc_stop("mergecalib_error_internal", "The solver returned a constraint-violating solution at stage `", stage, "`. Maximum violation: ",
+      .mc_stop("mergecalib_error_solver", "The solver returned a constraint-violating solution at stage `", stage, "`. Maximum violation: ",
                max(check$max_lower_violation, check$max_upper_violation), ".")
     }
     value <- sum(objective * x)
@@ -97,6 +97,13 @@
       membership = membership
     )
     last_solution <- .solve_highs(last_model, solver_control, start = current_start)
+  }
+  if (!.solution_available(last_solution, nrow(candidates))) {
+    .mc_stop(
+      "mergecalib_error_solver",
+      "Final optimization did not return a feasible solution. Solver status: ",
+      paste(last_solution$status_message, collapse = " "), "."
+    )
   }
   list(solution = last_solution, model = last_model, stages = stage_results, cuts = cuts)
 }
@@ -145,7 +152,7 @@ fit_merge_calibration <- function(
   .mc_require_consent()
   validate_merge_data(data, targets, spec)
   if (!is.list(candidate_levels) || !length(candidate_levels)) {
-    .mc_stop("mergecalib_error_internal", "`candidate_levels` must be a non-empty list.")
+    .mc_stop("mergecalib_error_input", "`candidate_levels` must be a non-empty list.")
   }
   if (is.null(names(candidate_levels))) {
     names(candidate_levels) <- paste0("level", seq_along(candidate_levels))
@@ -155,12 +162,12 @@ fit_merge_calibration <- function(
   }
   if (!is.numeric(max_delta) || length(max_delta) != 1L ||
       !is.finite(max_delta) || max_delta < 0 || max_delta > 1) {
-    .mc_stop("mergecalib_error_internal", "`max_delta` must be a single number between 0 and 1.")
+    .mc_stop("mergecalib_error_input", "`max_delta` must be a single number between 0 and 1.")
   }
 
   data <- as.data.frame(data, stringsAsFactors = FALSE)
   if (".mergecalib_original_row__" %in% names(data)) {
-    .mc_stop("mergecalib_error_internal", "The input data contains the reserved column `.mergecalib_original_row__`; please rename it first.")
+    .mc_stop("mergecalib_error_input", "The input data contains the reserved column `.mergecalib_original_row__`; please rename it first.")
   }
   data$.mergecalib_original_row__ <- seq_len(nrow(data))
   ord <- .lex_order(
@@ -216,7 +223,7 @@ fit_merge_calibration <- function(
   } else {
     if (!isTRUE(relax_targets)) {
       .mc_stop(
-        "mergecalib_error_internal",
+        "mergecalib_error_infeasible",
         "The original target intervals are infeasible at every candidate-expansion level. ",
         "Set relax_targets = TRUE to search for the minimum uniform relaxation."
       )
@@ -230,7 +237,7 @@ fit_merge_calibration <- function(
     relaxation_history <- relaxed$history
     if (!relaxed$feasible) {
       .mc_stop(
-        "mergecalib_error_internal",
+        "mergecalib_error_infeasible",
         "The model remains infeasible even after relaxing every target interval uniformly on both sides by ", max_delta,
         ". You need to widen the candidate-merge range, relax the weight bounds, or re-check the targets."
       )

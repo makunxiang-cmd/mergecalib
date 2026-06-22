@@ -174,18 +174,28 @@
     mip_abs_gap = 1e-7
   )
   ctrl <- utils::modifyList(defaults, solver_control)
-  high_ctrl <- do.call(highs::highs_control, ctrl)
-  highs::highs_solve(
-    L = model$L,
-    lower = model$lower,
-    upper = model$upper,
-    A = model$A,
-    lhs = model$lhs,
-    rhs = model$rhs,
-    types = model$types,
-    maximum = FALSE,
-    start = start,
-    control = high_ctrl
+  high_ctrl <- tryCatch(
+    do.call(highs::highs_control, ctrl),
+    error = function(e) {
+      .mc_stop("mergecalib_error_solver", "HiGHS control setup failed: ", conditionMessage(e))
+    }
+  )
+  tryCatch(
+    highs::highs_solve(
+      L = model$L,
+      lower = model$lower,
+      upper = model$upper,
+      A = model$A,
+      lhs = model$lhs,
+      rhs = model$rhs,
+      types = model$types,
+      maximum = FALSE,
+      start = start,
+      control = high_ctrl
+    ),
+    error = function(e) {
+      .mc_stop("mergecalib_error_solver", "HiGHS solve failed: ", conditionMessage(e))
+    }
   )
 }
 
