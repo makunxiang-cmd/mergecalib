@@ -54,3 +54,53 @@ test_that("distance block helper only returns province-sized matrices", {
   expect_equal(dim(dist), c(nrow(p1), nrow(p1)))
   expect_true(all(diag(dist) == 0))
 })
+
+test_that("implicit ordered levels preserve national spacing inside province blocks", {
+  dat <- data.frame(
+    province = c("P1", "P1", "P1", "P2", "P2"),
+    cell_id = paste0("C", 1:5),
+    n = c(5L, 6L, 7L, 8L, 11L),
+    weight = c(5, 6, 7, 8, 11),
+    A = c(5L, 6L, 7L, 8L, 11L),
+    B = 0L,
+    C = 0L,
+    D = 0L,
+    sex = "F",
+    urban = "U",
+    age = c("a", "b", "c", "a", "c"),
+    education = "same",
+    stringsAsFactors = FALSE
+  )
+  spec <- merge_spec(ordered_groups = "age")
+
+  cand <- generate_candidate_clusters(
+    dat, spec,
+    max_cluster_size = 2,
+    max_neighbors = 1,
+    max_distance = 2
+  )
+  p2_pair <- cand[cand$cluster_key == "4:5", , drop = FALSE]
+
+  expect_equal(nrow(p2_pair), 1L)
+  expect_equal(p2_pair$demo_distance, 16)
+
+  tight <- generate_candidate_clusters(
+    dat, spec,
+    max_cluster_size = 2,
+    max_neighbors = 1,
+    max_distance = 1
+  )
+  expect_false("4:5" %in% tight$cluster_key)
+})
+
+test_that("distance lookup maps later global rows and rejects out-of-block rows", {
+  dist_mat <- matrix(c(0, 7, 7, 0), nrow = 2)
+  lookup <- .dist_lookup_block(dist_mat, c(`4` = 1L, `8` = 2L))
+
+  expect_equal(lookup(8, 4), 7)
+  expect_equal(lookup(c(4, 8), 4), c(0, 7))
+  expect_error(
+    lookup(4, 5),
+    class = "mergecalib_error_internal"
+  )
+})

@@ -18,6 +18,24 @@
   as.character(x)
 }
 
+.distance_spec_global_ordered_levels <- function(data, spec) {
+  out <- spec
+  if (is.null(out$level_orders)) out$level_orders <- list()
+  for (g in spec$ordered_groups) {
+    explicit <- g %in% names(out$level_orders) && !is.null(out$level_orders[[g]])
+    if (explicit) next
+
+    col <- spec$groups[[g]]
+    x <- data[[col]]
+    if (is.factor(x) && is.ordered(x)) {
+      out$level_orders[[g]] <- levels(x)
+    } else if (!is.numeric(x)) {
+      out$level_orders[[g]] <- sort(unique(as.character(x)), method = "radix")
+    }
+  }
+  out
+}
+
 .distance_matrix_block <- function(data, spec, distance_weights = NULL) {
   group_names <- names(spec$groups)
   if (is.null(distance_weights)) {
@@ -45,10 +63,18 @@
 
 .dist_lookup_block <- function(dist_mat, global_to_local) {
   function(i, j) {
-    dist_mat[
-      global_to_local[as.character(i)],
-      global_to_local[as.character(j)]
-    ]
+    ii <- global_to_local[as.character(i)]
+    jj <- global_to_local[as.character(j)]
+    if (anyNA(ii) || anyNA(jj)) {
+      bad <- unique(c(as.character(i)[is.na(ii)], as.character(j)[is.na(jj)]))
+      .mc_stop(
+        "mergecalib_error_internal",
+        "Internal distance lookup received an out-of-block row index: ",
+        paste(bad, collapse = ", "),
+        "."
+      )
+    }
+    dist_mat[ii, jj]
   }
 }
 
@@ -190,6 +216,7 @@ generate_candidate_clusters <- function(
   }
 
   data <- as.data.frame(data, stringsAsFactors = FALSE)
+  distance_spec <- .distance_spec_global_ordered_levels(data, spec)
   province <- as.character(data[[spec$province]])
   n <- data[[spec$n]]
   ids <- as.character(data[[spec$id]])
@@ -198,7 +225,7 @@ generate_candidate_clusters <- function(
   for (p in sort(unique(province), method = "radix")) {
     idx <- which(province == p)
     block <- data[idx, , drop = FALSE]
-    dist_mat <- .distance_matrix_block(block, spec, distance_weights)
+    dist_mat <- .distance_matrix_block(block, distance_spec, distance_weights)
     local_to_global <- idx
     global_to_local <- seq_along(idx)
     names(global_to_local) <- as.character(idx)
