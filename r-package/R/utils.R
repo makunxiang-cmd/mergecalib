@@ -64,9 +64,20 @@
   !is.null(x) && length(x) == nvar && all(is.finite(x))
 }
 
+.status_text <- function(sol) {
+  values <- unlist(list(sol$status_message, sol$status), use.names = FALSE)
+  values <- as.character(values[!is.na(values)])
+  paste(values, collapse = " ")
+}
+
 .status_is_optimal <- function(sol) {
-  msg <- tolower(paste(sol$status_message, collapse = " "))
+  msg <- tolower(.status_text(sol))
   grepl("optimal", msg, fixed = TRUE)
+}
+
+.status_is_infeasible <- function(sol) {
+  msg <- tolower(.status_text(sol))
+  grepl("infeasible", msg, fixed = TRUE)
 }
 
 .compact_number <- function(x, digits = 6) {

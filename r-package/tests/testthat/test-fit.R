@@ -49,6 +49,26 @@ test_that("disabled relaxation uses infeasible class when strict targets fail", 
   )
 })
 
+test_that("feasibility solver termination uses solver class", {
+  skip_if_not_installed("highs")
+  dat <- example_merge_data()
+  spec <- merge_spec(level_orders = list(
+    age = c("18-39", "40+"),
+    education = c("low", "high")
+  ))
+  targets <- example_merge_targets(dat, spec, half_width = 0)
+
+  expect_error(
+    fit_merge_calibration(
+      dat, targets, spec,
+      candidate_levels = default_candidate_levels()[1],
+      relax_targets = FALSE,
+      solver_control = list(time_limit = 0)
+    ),
+    class = "mergecalib_error_solver"
+  )
+})
+
 test_that("invalid solver_control uses input class", {
   skip_if_not_installed("highs")
   dat <- example_merge_data()

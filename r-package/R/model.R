@@ -280,13 +280,30 @@
     membership = membership
   )
   sol <- .solve_highs(model, solver_control)
-  available <- .solution_available(sol, nrow(candidates))
-  valid <- FALSE
   check <- NULL
-  if (available) {
-    x <- as.numeric(sol$primal_solution > 0.5)
-    check <- .check_solution_constraints(model, x)
-    valid <- isTRUE(check$valid)
+  if (.status_is_infeasible(sol)) {
+    return(list(feasible = FALSE, solution = sol, model = model, check = check))
   }
-  list(feasible = available && valid, solution = sol, model = model, check = check)
+
+  available <- .solution_available(sol, nrow(candidates))
+  if (!available) {
+    status <- .status_text(sol)
+    if (!nzchar(status)) status <- "unknown"
+    .mc_stop(
+      "mergecalib_error_solver",
+      "Feasibility solve did not return a feasible solution. Solver status: ",
+      status, "."
+    )
+  }
+
+  x <- as.numeric(sol$primal_solution > 0.5)
+  check <- .check_solution_constraints(model, x)
+  if (!isTRUE(check$valid)) {
+    .mc_stop(
+      "mergecalib_error_solver",
+      "The solver returned a constraint-violating feasibility solution. Maximum violation: ",
+      max(check$max_lower_violation, check$max_upper_violation), "."
+    )
+  }
+  list(feasible = TRUE, solution = sol, model = model, check = check)
 }
