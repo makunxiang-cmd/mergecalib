@@ -47,3 +47,10 @@ test_that("warning thresholds are merged with defaults", {
   expect_equal(thresholds$relaxation_delta, 0.02)
   expect_equal(thresholds$near_binding_margin, 0.005)
 })
+
+test_that("merge_spec validation failures use spec class", {
+  expect_error(
+    merge_spec(grades = character()),
+    class = "mergecalib_error_spec"
+  )
+})
