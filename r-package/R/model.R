@@ -161,9 +161,8 @@
   )
 }
 
-.solve_highs <- function(model, solver_control = list(), start = NULL) {
-  .assert_installed("highs")
-  defaults <- list(
+.highs_default_control <- function() {
+  list(
     threads = 1L,
     time_limit = Inf,
     log_to_console = FALSE,
@@ -173,11 +172,69 @@
     mip_rel_gap = 1e-7,
     mip_abs_gap = 1e-7
   )
+}
+
+.highs_available_option_names <- function() {
+  out <- tryCatch(
+    highs::highs_available_solver_options(),
+    error = function(e) NULL
+  )
+  if (is.data.frame(out)) {
+    if ("option" %in% names(out)) return(as.character(out$option))
+    if ("name" %in% names(out)) return(as.character(out$name))
+  }
+  if (is.list(out)) {
+    if (!is.null(out$option)) return(as.character(out$option))
+    if (!is.null(out$name)) return(as.character(out$name))
+    if (!is.null(names(out))) return(names(out))
+  }
+  character()
+}
+
+.validate_solver_control <- function(solver_control) {
+  if (is.null(solver_control)) return(list())
+  if (!is.list(solver_control)) {
+    .mc_stop("mergecalib_error_input", "`solver_control` must be a named list.")
+  }
+  if (!length(solver_control)) return(solver_control)
+
+  nms <- names(solver_control)
+  if (is.null(nms) || anyNA(nms) || any(!nzchar(nms))) {
+    .mc_stop("mergecalib_error_input", "`solver_control` entries must be named.")
+  }
+  duplicates <- unique(nms[duplicated(nms)])
+  if (length(duplicates)) {
+    .mc_stop(
+      "mergecalib_error_input",
+      "`solver_control` entries must not be duplicated: ",
+      paste(duplicates, collapse = ", "), "."
+    )
+  }
+
+  allowed <- .highs_available_option_names()
+  if (length(allowed)) {
+    unknown <- setdiff(nms, allowed)
+    if (length(unknown)) {
+      .mc_stop(
+        "mergecalib_error_input",
+        "Unknown `solver_control` option",
+        if (length(unknown) > 1L) "s" else "",
+        ": ", paste(unknown, collapse = ", "), "."
+      )
+    }
+  }
+  solver_control
+}
+
+.solve_highs <- function(model, solver_control = list(), start = NULL) {
+  .assert_installed("highs")
+  defaults <- .highs_default_control()
+  solver_control <- .validate_solver_control(solver_control)
   ctrl <- utils::modifyList(defaults, solver_control)
   high_ctrl <- tryCatch(
     do.call(highs::highs_control, ctrl),
     error = function(e) {
-      .mc_stop("mergecalib_error_solver", "HiGHS control setup failed: ", conditionMessage(e))
+      .mc_stop("mergecalib_error_input", "Invalid `solver_control`: ", conditionMessage(e))
     }
   )
   tryCatch(

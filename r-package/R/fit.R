@@ -25,6 +25,25 @@
   list(feasible = TRUE, delta = high, solve = best, history = history)
 }
 
+.validate_objective_order <- function(objective_order) {
+  if (!is.character(objective_order) || !length(objective_order) ||
+      anyNA(objective_order) || any(!nzchar(objective_order))) {
+    .mc_stop(
+      "mergecalib_error_input",
+      "`objective_order` must be a non-empty character vector without missing values."
+    )
+  }
+  duplicates <- unique(objective_order[duplicated(objective_order)])
+  if (length(duplicates)) {
+    .mc_stop(
+      "mergecalib_error_input",
+      "`objective_order` must not contain duplicate names: ",
+      paste(duplicates, collapse = ", "), "."
+    )
+  }
+  objective_order
+}
+
 .lexicographic_solve <- function(data, targets, candidates, spec, delta,
                                  objective_order, solver_control,
                                  lex_tolerance_abs, lex_tolerance_rel,
@@ -150,6 +169,8 @@ fit_merge_calibration <- function(
 ) {
   .assert_installed("highs")
   .mc_require_consent()
+  objective_order <- .validate_objective_order(objective_order)
+  solver_control <- .validate_solver_control(solver_control)
   validate_merge_data(data, targets, spec)
   if (!is.list(candidate_levels) || !length(candidate_levels)) {
     .mc_stop("mergecalib_error_input", "`candidate_levels` must be a non-empty list.")
