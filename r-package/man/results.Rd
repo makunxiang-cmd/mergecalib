@@ -18,7 +18,10 @@ province_results(fit)
 national_cell_results(fit, include_zero = FALSE)
 calculate_results(fit, by)
 audit_merge_fit(fit, tolerance = 1e-6)
-export_merge_results(fit, path, overwrite = FALSE, include_zero_national = FALSE, save_fit = TRUE)
+export_merge_results(
+  fit, path, overwrite = FALSE, include_zero_national = FALSE,
+  save_fit = TRUE
+)
 }
 \arguments{
 \item{fit}{A fitted \code{mergecalib_fit} object.}

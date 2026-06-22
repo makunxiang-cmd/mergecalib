@@ -1,3 +1,13 @@
+# mergecalib 0.2.0.9000
+
+- Added classed mergecalib error and warning conditions for v0.2.0 development.
+- Reworked candidate generation to compute demographic distances by province
+  block instead of allocating a full-dataset distance matrix.
+- Added conservative post-fit warnings for large relaxation, high weight
+  distortion, high heterogeneity, and near-binding targets.
+- Expanded tests around condition classes, candidate invariants, and warning
+  controls.
+
 # mergecalib 0.1.0
 
 - First installable source release.

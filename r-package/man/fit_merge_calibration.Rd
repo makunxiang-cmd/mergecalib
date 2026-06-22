@@ -31,6 +31,14 @@ fit_merge_calibration(
 Selects a strict once-only partition of original cells using a mixed-integer
 linear program. All selected final clusters have positive sample size.
 }
+\details{
+After a valid fit is built, conservative classed warnings may be emitted for
+large target relaxation, high final weight distortion, high cluster
+heterogeneity, or near-binding targets. Set \code{options(mergecalib.warn =
+FALSE)} to suppress these warnings, or set
+\code{options(mergecalib.warning_thresholds = list(...))} to override warning
+thresholds.
+}
 \examples{
 \dontrun{
 spec <- merge_spec(level_orders = list(

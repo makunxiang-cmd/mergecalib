@@ -6,6 +6,9 @@ enhancements agreed with the maintainer. CRAN submission happens only after a
 later hardening pass (testing, feature selection, performance tuning); see
 [Road to CRAN](#9-road-to-cran-post-020).
 
+**0.2.0-alpha status:** Foundation work has landed for A3, C1, C2, and the
+initial E test scaffold. Remaining v0.2.0-beta work starts from A1/A2/B1/B2.
+
 This roadmap was produced from a four-lens review (mathematics / optimization,
 statistics, systems engineering, software engineering) of the v0.1.0 source.
 

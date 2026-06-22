@@ -21,6 +21,14 @@ The project is built around five guarantees:
 4. Identical inputs and package version should produce identical outputs.
 5. Sample size, total weight, and grade counts are conserved.
 
+## v0.2.0 Alpha Foundation
+
+The v0.2.0 development line introduces classed package conditions, conservative
+post-fit warning hooks, and province-blocked candidate distance computation.
+These changes preserve positive-final-sample, no-cross-province-borrowing,
+determinism, and conservation invariants while replacing message-string tests
+with stable condition-class contracts.
+
 ## Solver Flow
 
 1. `validate_merge_data()` checks schema, uniqueness, non-negative counts and
@@ -74,7 +82,7 @@ r-package/R/utils.R        internal helpers
 
 ## Current Status
 
-Version `0.1.0` is an experimental package release candidate. The package has
-tests, a vignette, GitHub Actions configuration, a pkgdown configuration, and
-CRAN-oriented metadata, but CRAN submission should wait until `R CMD check
---as-cran` has been run locally and CI is green.
+Version `0.2.0.9000` is an experimental development build for v0.2.0 alpha
+foundations. CRAN submission should wait until the later beta and hardening
+workstreams are complete and local plus CI `R CMD check --as-cran` results are
+green.
