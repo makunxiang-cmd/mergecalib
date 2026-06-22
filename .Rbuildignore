@@ -11,6 +11,7 @@
 ^CONTRIBUTING\.md$
 ^CODE_OF_CONDUCT\.md$
 ^AGENTS\.md$
+^ROADMAP_v0\.2\.0\.md$
 ^GIT_AND_PUSH\.md$
 ^push_to_github\.sh$
 ^\.DS_Store$
